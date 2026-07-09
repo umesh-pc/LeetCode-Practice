@@ -1,9 +1,10 @@
 class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-        visted={}
-        for i in range (len(nums)):
-            visted[nums[i]]=i
-        for i in range(len(nums)):
-            rem=target-nums[i]
-            if rem in visted and i != visted[rem]:
-                return[visted[rem],i]
+        rem=0
+        for i,num in enumerate(nums):
+            rem=target-num
+            if rem in nums:
+               j= nums.index(rem)
+               if i!=j:
+                    return [i,j]
+        
