@@ -1,17 +1,17 @@
 class Solution:
     def isValid(self, s: str) -> bool:
-        stack = []
-        typeMap = {'}':'{', ']':'[', ')':'('}
+        if len(s)%2 !=0:
+            return False
+        stack=[]
+        dic={'(':')','{':'}','[':']'}
         for i in s:
-            if i in ['{','[','(']:
+            if i in dic.keys():
                 stack.append(i)
             else:
-                if not stack:
+                if stack==[]:
                     return False
-                elif stack[-1] == typeMap[i]:
-                    stack.pop()
-                else:
+                a=stack.pop()
+                if i !=dic[a]:
                     return False
-        if not stack:
-            return True
-        return False
+        return stack==[]
+        
