@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 
   schedule:
-    # Run every 6 hours
     - cron: "0 */6 * * *"
 
 permissions:
@@ -16,17 +15,9 @@ jobs:
 
     steps:
 
-      # ---------------------------------------------------------
-      # Checkout repository
-      # ---------------------------------------------------------
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-
-      # ---------------------------------------------------------
-      # Setup Python
-      # ---------------------------------------------------------
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,18 +25,10 @@ jobs:
           python-version: "3.12"
 
 
-      # ---------------------------------------------------------
-      # Install requests
-      # ---------------------------------------------------------
-
       - name: Install dependencies
         run: |
           pip install requests
 
-
-      # ---------------------------------------------------------
-      # Sync LeetCode
-      # ---------------------------------------------------------
 
       - name: Sync LeetCode submissions
         env:
@@ -63,85 +46,141 @@ jobs:
 
 
           # =====================================================
-          # Configuration
+          # CONFIGURATION
           # =====================================================
 
-          LEETCODE_URL = "https://leetcode.com/graphql"
+          GRAPHQL_URL = "https://leetcode.com/graphql/"
+
 
           SESSION = os.environ["LEETCODE_SESSION"]
+
           CSRF_TOKEN = os.environ["LEETCODE_CSRF_TOKEN"]
 
 
           # =====================================================
-          # Create HTTP session
+          # HTTP SESSION
           # =====================================================
 
           session = requests.Session()
 
           session.headers.update({
+
               "Content-Type": "application/json",
+
               "Origin": "https://leetcode.com",
+
               "Referer": "https://leetcode.com/",
-              "User-Agent": "Mozilla/5.0",
+
+              "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) "
+                  "Chrome/151.0.0.0 Safari/537.36",
+
               "x-csrftoken": CSRF_TOKEN
+
           })
 
+
           session.cookies.update({
+
               "LEETCODE_SESSION": SESSION,
+
               "csrftoken": CSRF_TOKEN
+
           })
 
 
           # =====================================================
-          # GraphQL helper
+          # GRAPHQL FUNCTION
           # =====================================================
 
           def graphql(query, variables=None):
 
               response = session.post(
-                  LEETCODE_URL,
+
+                  GRAPHQL_URL,
+
                   json={
+
                       "query": query,
+
                       "variables": variables or {}
+
                   },
+
                   timeout=30
+
               )
 
-              response.raise_for_status()
+
+              print(
+                  f"HTTP Status: {response.status_code}"
+              )
+
+
+              if response.status_code != 200:
+
+                  print("LeetCode response:")
+
+                  print(response.text[:5000])
+
+                  raise Exception(
+                      f"LeetCode returned HTTP "
+                      f"{response.status_code}"
+                  )
+
 
               result = response.json()
 
+
               if "errors" in result:
 
-                  print("GraphQL error:")
+                  print("GraphQL errors:")
+
                   print(result["errors"])
 
-                  return None
+                  raise Exception(
+                      "GraphQL request failed"
+                  )
+
 
               return result.get("data")
 
 
           # =====================================================
-          # Get username automatically
+          # GET CURRENT USER
           # =====================================================
+
+          print()
 
           print("Checking LeetCode login...")
 
+
           user_query = """
+
           query {
+
               userStatus {
+
                   isSignedIn
+
                   username
+
               }
+
           }
+
           """
 
+
           user_data = graphql(user_query)
+
 
           if not user_data:
 
               raise Exception(
-                  "Could not connect to LeetCode."
+                  "Could not get user information."
               )
 
 
@@ -151,62 +190,79 @@ jobs:
           if not user_status["isSignedIn"]:
 
               raise Exception(
-                  "LeetCode session is invalid or expired."
+                  "LeetCode session has expired."
               )
 
 
           username = user_status["username"]
 
+
           print(
-              f"Successfully authenticated as: {username}"
+              f"Successfully authenticated as: "
+              f"{username}"
           )
 
 
           # =====================================================
-          # Fetch accepted submissions
+          # GET ACCEPTED SUBMISSIONS
           # =====================================================
 
-          submissions_query = """
-          query recentAcSubmissions(
-              $username: String!
-              $limit: Int!
-              $offset: Int!
-          ) {
-
-              recentAcSubmissionList(
-                  username: $username
-                  limit: $limit
-                  offset: $offset
-              ) {
-
-                  id
-                  title
-                  titleSlug
-                  timestamp
-                  lang
-              }
-          }
-          """
-
-
           print()
+
           print("Fetching accepted submissions...")
 
 
-          submissions_data = graphql(
-              submissions_query,
-              {
-                  "username": username,
-                  "limit": 100,
-                  "offset": 0
+          submissions_query = """
+
+          query recentAcSubmissions(
+              $username: String!
+              $limit: Int!
+          ) {
+
+              recentAcSubmissionList(
+
+                  username: $username
+
+                  limit: $limit
+
+              ) {
+
+                  id
+
+                  title
+
+                  titleSlug
+
+                  timestamp
+
+                  lang
+
               }
+
+          }
+
+          """
+
+
+          submissions_data = graphql(
+
+              submissions_query,
+
+              {
+
+                  "username": username,
+
+                  "limit": 100
+
+              }
+
           )
 
 
           if not submissions_data:
 
               raise Exception(
-                  "Could not retrieve submissions."
+                  "No submission data received."
               )
 
 
@@ -216,12 +272,13 @@ jobs:
 
 
           print(
-              f"Found {len(submissions)} accepted submissions."
+              f"Found {len(submissions)} "
+              f"accepted submissions."
           )
 
 
           # =====================================================
-          # Language → extension
+          # LANGUAGE EXTENSIONS
           # =====================================================
 
           extensions = {
@@ -257,11 +314,12 @@ jobs:
               "scala": "scala",
 
               "sql": "sql"
+
           }
 
 
           # =====================================================
-          # Clean folder names
+          # CLEAN FOLDER NAME
           # =====================================================
 
           def clean_name(name):
@@ -278,7 +336,7 @@ jobs:
 
 
           # =====================================================
-          # Submission details query
+          # SUBMISSION DETAILS
           # =====================================================
 
           detail_query = """
@@ -292,24 +350,32 @@ jobs:
               ) {
 
                   code
+
                   lang
+
                   timestamp
+
                   statusCode
 
                   question {
 
                       questionFrontendId
+
                       title
+
                       titleSlug
+
                   }
+
               }
+
           }
 
           """
 
 
           # =====================================================
-          # Download solutions
+          # DOWNLOAD SOLUTIONS
           # =====================================================
 
           new_solutions = 0
@@ -328,10 +394,6 @@ jobs:
               language = submission["lang"]
 
 
-              # -------------------------------------------------
-              # Determine file extension
-              # -------------------------------------------------
-
               extension = extensions.get(
                   language.lower()
               )
@@ -340,16 +402,13 @@ jobs:
               if not extension:
 
                   print(
-                      f"Skipping {title} "
-                      f"(unsupported language: {language})"
+                      f"Skipping {title} - "
+                      f"unsupported language: "
+                      f"{language}"
                   )
 
                   continue
 
-
-              # -------------------------------------------------
-              # Folder structure
-              # -------------------------------------------------
 
               folder_name = clean_name(slug)
 
@@ -361,13 +420,16 @@ jobs:
 
 
               filepath = os.path.join(
+
                   folder,
+
                   f"solution.{extension}"
+
               )
 
 
               # -------------------------------------------------
-              # Don't download duplicate solutions
+              # Skip existing solutions
               # -------------------------------------------------
 
               if os.path.exists(filepath):
@@ -379,30 +441,29 @@ jobs:
                   continue
 
 
-              # -------------------------------------------------
-              # Get actual submitted code
-              # -------------------------------------------------
+              print()
 
               print(
                   f"Downloading: {title}"
               )
 
 
+              # -------------------------------------------------
+              # Get submitted code
+              # -------------------------------------------------
+
               detail_data = graphql(
+
                   detail_query,
+
                   {
-                      "submissionId": submission_id
+
+                      "submissionId":
+                          submission_id
+
                   }
+
               )
-
-
-              if not detail_data:
-
-                  print(
-                      f"Failed to get details: {title}"
-                  )
-
-                  continue
 
 
               details = detail_data.get(
@@ -413,7 +474,8 @@ jobs:
               if not details:
 
                   print(
-                      f"No submission details: {title}"
+                      f"Could not get details "
+                      f"for {title}"
                   )
 
                   continue
@@ -425,7 +487,8 @@ jobs:
               if not code:
 
                   print(
-                      f"No code returned: {title}"
+                      f"No code returned "
+                      f"for {title}"
                   )
 
                   continue
@@ -440,12 +503,15 @@ jobs:
 
 
               # -------------------------------------------------
-              # Create folder
+              # Create directory
               # -------------------------------------------------
 
               os.makedirs(
+
                   folder,
+
                   exist_ok=True
+
               )
 
 
@@ -456,34 +522,52 @@ jobs:
               if extension == "sql":
 
                   metadata = (
+
                       f"-- LeetCode Problem: "
                       f"{problem_number}. {title}\n"
-                      f"-- Language: {language}\n"
-                      f"-- Submission ID: {submission_id}\n"
+
+                      f"-- Language: "
+                      f"{language}\n"
+
+                      f"-- Submission ID: "
+                      f"{submission_id}\n"
+
                       f"-- https://leetcode.com/problems/"
                       f"{slug}/\n\n"
+
                   )
 
               else:
 
                   metadata = (
+
                       f"# LeetCode Problem: "
                       f"{problem_number}. {title}\n"
-                      f"# Language: {language}\n"
-                      f"# Submission ID: {submission_id}\n"
+
+                      f"# Language: "
+                      f"{language}\n"
+
+                      f"# Submission ID: "
+                      f"{submission_id}\n"
+
                       f"# https://leetcode.com/problems/"
                       f"{slug}/\n\n"
+
                   )
 
 
               # -------------------------------------------------
-              # Write solution
+              # Save code
               # -------------------------------------------------
 
               with open(
+
                   filepath,
+
                   "w",
+
                   encoding="utf-8"
+
               ) as file:
 
                   file.write(
@@ -492,57 +576,61 @@ jobs:
 
 
               print(
-                  f"Saved → {filepath}"
+                  f"Saved: {filepath}"
               )
 
 
               new_solutions += 1
 
 
-              # Prevent excessive requests
               time.sleep(1)
 
 
           # =====================================================
-          # Summary
+          # SUMMARY
           # =====================================================
 
           print()
-          print("=" * 50)
+
+          print("=" * 60)
 
           print(
-              f"New solutions added: {new_solutions}"
+              f"New solutions added: "
+              f"{new_solutions}"
           )
 
-          print("=" * 50)
+          print("=" * 60)
 
 
           PY
 
 
-      # ---------------------------------------------------------
-      # Commit changes
-      # ---------------------------------------------------------
+      # =========================================================
+      # COMMIT
+      # =========================================================
 
       - name: Commit solutions
         run: |
 
-          git config user.name "github-actions[bot]"
+          git config user.name \
+            "github-actions[bot]"
 
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
+
           git add solutions
+
 
           if git diff --cached --quiet; then
 
-            echo "No new solutions found."
+              echo "No new solutions."
 
           else
 
-            git commit \
-              -m "Sync LeetCode solutions"
+              git commit \
+                -m "Sync LeetCode solutions"
 
-            git push
+              git push
 
           fi
