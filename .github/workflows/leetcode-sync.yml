@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 
   schedule:
+    # Run every 6 hours
     - cron: "0 */6 * * *"
 
 permissions:
@@ -15,9 +16,17 @@ jobs:
 
     steps:
 
+      # =========================================================
+      # CHECKOUT REPOSITORY
+      # =========================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
+      # =========================================================
+      # SETUP PYTHON
+      # =========================================================
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -25,10 +34,18 @@ jobs:
           python-version: "3.12"
 
 
+      # =========================================================
+      # INSTALL DEPENDENCIES
+      # =========================================================
+
       - name: Install dependencies
         run: |
           pip install requests
 
+
+      # =========================================================
+      # SYNC LEETCODE
+      # =========================================================
 
       - name: Sync LeetCode submissions
         env:
@@ -58,18 +75,22 @@ jobs:
 
 
           # =====================================================
-          # HTTP SESSION
+          # CREATE HTTP SESSION
           # =====================================================
 
           session = requests.Session()
 
+
           session.headers.update({
 
-              "Content-Type": "application/json",
+              "Content-Type":
+                  "application/json",
 
-              "Origin": "https://leetcode.com",
+              "Origin":
+                  "https://leetcode.com",
 
-              "Referer": "https://leetcode.com/",
+              "Referer":
+                  "https://leetcode.com/",
 
               "User-Agent":
                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -77,22 +98,25 @@ jobs:
                   "(KHTML, like Gecko) "
                   "Chrome/151.0.0.0 Safari/537.36",
 
-              "x-csrftoken": CSRF_TOKEN
+              "x-csrftoken":
+                  CSRF_TOKEN
 
           })
 
 
           session.cookies.update({
 
-              "LEETCODE_SESSION": SESSION,
+              "LEETCODE_SESSION":
+                  SESSION,
 
-              "csrftoken": CSRF_TOKEN
+              "csrftoken":
+                  CSRF_TOKEN
 
           })
 
 
           # =====================================================
-          # GRAPHQL FUNCTION
+          # GRAPHQL REQUEST FUNCTION
           # =====================================================
 
           def graphql(query, variables=None):
@@ -103,9 +127,11 @@ jobs:
 
                   json={
 
-                      "query": query,
+                      "query":
+                          query,
 
-                      "variables": variables or {}
+                      "variables":
+                          variables or {}
 
                   },
 
@@ -119,26 +145,44 @@ jobs:
               )
 
 
+              # -------------------------------------------------
+              # Handle HTTP errors
+              # -------------------------------------------------
+
               if response.status_code != 200:
 
+                  print()
                   print("LeetCode response:")
 
-                  print(response.text[:5000])
-
-                  raise Exception(
-                      f"LeetCode returned HTTP "
-                      f"{response.status_code}"
+                  print(
+                      response.text[:5000]
                   )
 
+                  raise Exception(
+                      f"LeetCode returned "
+                      f"HTTP {response.status_code}"
+                  )
+
+
+              # -------------------------------------------------
+              # Parse JSON
+              # -------------------------------------------------
 
               result = response.json()
 
 
+              # -------------------------------------------------
+              # Handle GraphQL errors
+              # -------------------------------------------------
+
               if "errors" in result:
 
+                  print()
                   print("GraphQL errors:")
 
-                  print(result["errors"])
+                  print(
+                      result["errors"]
+                  )
 
                   raise Exception(
                       "GraphQL request failed"
@@ -149,11 +193,10 @@ jobs:
 
 
           # =====================================================
-          # GET CURRENT USER
+          # GET LOGGED-IN USER
           # =====================================================
 
           print()
-
           print("Checking LeetCode login...")
 
 
@@ -174,27 +217,35 @@ jobs:
           """
 
 
-          user_data = graphql(user_query)
+          user_data = graphql(
+              user_query
+          )
 
 
           if not user_data:
 
               raise Exception(
-                  "Could not get user information."
+                  "Could not get LeetCode user information."
               )
 
 
-          user_status = user_data["userStatus"]
+          user_status = user_data[
+              "userStatus"
+          ]
 
 
-          if not user_status["isSignedIn"]:
+          if not user_status[
+              "isSignedIn"
+          ]:
 
               raise Exception(
-                  "LeetCode session has expired."
+                  "LeetCode session is invalid or expired."
               )
 
 
-          username = user_status["username"]
+          username = user_status[
+              "username"
+          ]
 
 
           print(
@@ -204,12 +255,13 @@ jobs:
 
 
           # =====================================================
-          # GET ACCEPTED SUBMISSIONS
+          # GET RECENT ACCEPTED SUBMISSIONS
           # =====================================================
 
           print()
-
-          print("Fetching accepted submissions...")
+          print(
+              "Fetching accepted submissions..."
+          )
 
 
           submissions_query = """
@@ -235,8 +287,6 @@ jobs:
 
                   timestamp
 
-                  lang
-
               }
 
           }
@@ -250,9 +300,11 @@ jobs:
 
               {
 
-                  "username": username,
+                  "username":
+                      username,
 
-                  "limit": 100
+                  "limit":
+                      100
 
               }
 
@@ -278,53 +330,76 @@ jobs:
 
 
           # =====================================================
-          # LANGUAGE EXTENSIONS
+          # LANGUAGE → FILE EXTENSION
           # =====================================================
 
           extensions = {
 
-              "python": "py",
-              "python3": "py",
+              "python":
+                  "py",
 
-              "cpp": "cpp",
-              "c++": "cpp",
+              "python3":
+                  "py",
 
-              "java": "java",
+              "cpp":
+                  "cpp",
 
-              "javascript": "js",
-              "typescript": "ts",
+              "c++":
+                  "cpp",
 
-              "c": "c",
+              "java":
+                  "java",
 
-              "csharp": "cs",
-              "c#": "cs",
+              "javascript":
+                  "js",
 
-              "kotlin": "kt",
+              "typescript":
+                  "ts",
 
-              "swift": "swift",
+              "c":
+                  "c",
 
-              "go": "go",
+              "csharp":
+                  "cs",
 
-              "rust": "rs",
+              "c#":
+                  "cs",
 
-              "ruby": "rb",
+              "kotlin":
+                  "kt",
 
-              "php": "php",
+              "swift":
+                  "swift",
 
-              "scala": "scala",
+              "go":
+                  "go",
 
-              "sql": "sql"
+              "rust":
+                  "rs",
+
+              "ruby":
+                  "rb",
+
+              "php":
+                  "php",
+
+              "scala":
+                  "scala",
+
+              "sql":
+                  "sql"
 
           }
 
 
           # =====================================================
-          # CLEAN FOLDER NAME
+          # CLEAN PROBLEM NAME
           # =====================================================
 
           def clean_name(name):
 
               name = name.lower()
+
 
               name = re.sub(
                   r"[^a-z0-9]+",
@@ -332,11 +407,24 @@ jobs:
                   name
               )
 
+
               return name.strip("-")
 
 
           # =====================================================
-          # SUBMISSION DETAILS
+          # GET SUBMISSION DETAILS
+          #
+          # IMPORTANT:
+          #
+          # lang is now a LanguageNode.
+          #
+          # Therefore:
+          #
+          # lang {
+          #     name
+          #     verboseName
+          # }
+          #
           # =====================================================
 
           detail_query = """
@@ -351,11 +439,17 @@ jobs:
 
                   code
 
-                  lang
-
                   timestamp
 
                   statusCode
+
+                  lang {
+
+                      name
+
+                      verboseName
+
+                  }
 
                   question {
 
@@ -383,87 +477,104 @@ jobs:
 
           for submission in submissions:
 
+              # -------------------------------------------------
+              # Submission information
+              # -------------------------------------------------
+
               submission_id = int(
                   submission["id"]
               )
 
-              title = submission["title"]
 
-              slug = submission["titleSlug"]
-
-              language = submission["lang"]
-
-
-              extension = extensions.get(
-                  language.lower()
-              )
+              title = submission[
+                  "title"
+              ]
 
 
-              if not extension:
-
-                  print(
-                      f"Skipping {title} - "
-                      f"unsupported language: "
-                      f"{language}"
-                  )
-
-                  continue
-
-
-              folder_name = clean_name(slug)
-
-
-              folder = os.path.join(
-                  "solutions",
-                  folder_name
-              )
-
-
-              filepath = os.path.join(
-
-                  folder,
-
-                  f"solution.{extension}"
-
-              )
-
-
-              # -------------------------------------------------
-              # Skip existing solutions
-              # -------------------------------------------------
-
-              if os.path.exists(filepath):
-
-                  print(
-                      f"Already exists: {title}"
-                  )
-
-                  continue
+              slug = submission[
+                  "titleSlug"
+              ]
 
 
               print()
+              print(
+                  "----------------------------------------"
+              )
+
+
+              print(
+                  f"Processing: {title}"
+              )
+
+
+              print(
+                  f"Submission ID: "
+                  f"{submission_id}"
+              )
+
+
+              # -------------------------------------------------
+              # Create folder name
+              # -------------------------------------------------
+
+              folder_name = clean_name(
+                  slug
+              )
+
+
+              folder = os.path.join(
+
+                  "solutions",
+
+                  folder_name
+
+              )
+
+
+              # -------------------------------------------------
+              # Get submission details FIRST
+              #
+              # We need the language from here.
+              # -------------------------------------------------
 
               print(
                   f"Downloading: {title}"
               )
 
 
-              # -------------------------------------------------
-              # Get submitted code
-              # -------------------------------------------------
+              try:
 
-              detail_data = graphql(
+                  detail_data = graphql(
 
-                  detail_query,
+                      detail_query,
 
-                  {
+                      {
 
-                      "submissionId":
-                          submission_id
+                          "submissionId":
+                              submission_id
 
-                  }
+                      }
 
-              )
+                  )
+
+              except Exception as error:
+
+                  print(
+                      f"Failed to get "
+                      f"submission details: {error}"
+                  )
+
+                  continue
+
+
+              if not detail_data:
+
+                  print(
+                      f"No detail data for "
+                      f"{title}"
+                  )
+
+                  continue
 
 
               details = detail_data.get(
@@ -474,14 +585,20 @@ jobs:
               if not details:
 
                   print(
-                      f"Could not get details "
+                      f"No submission details "
                       f"for {title}"
                   )
 
                   continue
 
 
-              code = details.get("code")
+              # -------------------------------------------------
+              # Get submitted code
+              # -------------------------------------------------
+
+              code = details.get(
+                  "code"
+              )
 
 
               if not code:
@@ -494,12 +611,125 @@ jobs:
                   continue
 
 
-              question = details["question"]
+              # -------------------------------------------------
+              # Get language
+              #
+              # IMPORTANT:
+              #
+              # details["lang"] is an object:
+              #
+              # {
+              #     "name": "...",
+              #     "verboseName": "..."
+              # }
+              #
+              # -------------------------------------------------
+
+              language_data = details.get(
+                  "lang"
+              )
 
 
-              problem_number = question[
+              if not language_data:
+
+                  print(
+                      f"No language returned "
+                      f"for {title}"
+                  )
+
+                  continue
+
+
+              language = language_data.get(
+                  "name"
+              )
+
+
+              verbose_language = language_data.get(
+                  "verboseName"
+              )
+
+
+              if not language:
+
+                  print(
+                      f"Could not determine "
+                      f"language for {title}"
+                  )
+
+                  continue
+
+
+              print(
+                  f"Language: "
+                  f"{verbose_language}"
+              )
+
+
+              # -------------------------------------------------
+              # Find extension
+              # -------------------------------------------------
+
+              extension = extensions.get(
+                  language.lower()
+              )
+
+
+              if not extension:
+
+                  print(
+                      f"Unsupported language: "
+                      f"{language}"
+                  )
+
+                  continue
+
+
+              # -------------------------------------------------
+              # Check if solution already exists
+              # -------------------------------------------------
+
+              filepath = os.path.join(
+
+                  folder,
+
+                  f"solution.{extension}"
+
+              )
+
+
+              if os.path.exists(filepath):
+
+                  print(
+                      f"Already exists: "
+                      f"{filepath}"
+                  )
+
+                  continue
+
+
+              # -------------------------------------------------
+              # Get problem information
+              # -------------------------------------------------
+
+              question = details.get(
+                  "question"
+              )
+
+
+              if not question:
+
+                  print(
+                      f"No question information "
+                      f"for {title}"
+                  )
+
+                  continue
+
+
+              problem_number = question.get(
                   "questionFrontendId"
-              ]
+              )
 
 
               # -------------------------------------------------
@@ -515,24 +745,26 @@ jobs:
               )
 
 
-              # -------------------------------------------------
-              # Metadata
-              # -------------------------------------------------
+              # =================================================
+              # CREATE FILE HEADER
+              # =================================================
 
               if extension == "sql":
 
                   metadata = (
 
                       f"-- LeetCode Problem: "
-                      f"{problem_number}. {title}\n"
+                      f"{problem_number}. "
+                      f"{title}\n"
 
                       f"-- Language: "
-                      f"{language}\n"
+                      f"{verbose_language}\n"
 
                       f"-- Submission ID: "
                       f"{submission_id}\n"
 
-                      f"-- https://leetcode.com/problems/"
+                      f"-- "
+                      f"https://leetcode.com/problems/"
                       f"{slug}/\n\n"
 
                   )
@@ -542,71 +774,97 @@ jobs:
                   metadata = (
 
                       f"# LeetCode Problem: "
-                      f"{problem_number}. {title}\n"
+                      f"{problem_number}. "
+                      f"{title}\n"
 
                       f"# Language: "
-                      f"{language}\n"
+                      f"{verbose_language}\n"
 
                       f"# Submission ID: "
                       f"{submission_id}\n"
 
-                      f"# https://leetcode.com/problems/"
+                      f"# "
+                      f"https://leetcode.com/problems/"
                       f"{slug}/\n\n"
 
                   )
 
 
-              # -------------------------------------------------
-              # Save code
-              # -------------------------------------------------
+              # =================================================
+              # SAVE SOLUTION
+              # =================================================
 
-              with open(
+              try:
 
-                  filepath,
+                  with open(
 
-                  "w",
+                      filepath,
 
-                  encoding="utf-8"
+                      "w",
 
-              ) as file:
+                      encoding="utf-8"
 
-                  file.write(
-                      metadata + code
+                  ) as file:
+
+                      file.write(
+
+                          metadata +
+
+                          code
+
+                      )
+
+              except Exception as error:
+
+                  print(
+                      f"Failed to save "
+                      f"{filepath}: {error}"
                   )
+
+                  continue
 
 
               print(
-                  f"Saved: {filepath}"
+                  f"SUCCESS: Saved → "
+                  f"{filepath}"
               )
 
 
               new_solutions += 1
 
 
+              # -------------------------------------------------
+              # Small delay between requests
+              # -------------------------------------------------
+
               time.sleep(1)
 
 
           # =====================================================
-          # SUMMARY
+          # FINAL SUMMARY
           # =====================================================
 
           print()
-
-          print("=" * 60)
+          print()
+          print(
+              "=" * 60
+          )
 
           print(
               f"New solutions added: "
               f"{new_solutions}"
           )
 
-          print("=" * 60)
+          print(
+              "=" * 60
+          )
 
 
           PY
 
 
       # =========================================================
-      # COMMIT
+      # COMMIT AND PUSH
       # =========================================================
 
       - name: Commit solutions
@@ -614,6 +872,7 @@ jobs:
 
           git config user.name \
             "github-actions[bot]"
+
 
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
@@ -624,7 +883,7 @@ jobs:
 
           if git diff --cached --quiet; then
 
-              echo "No new solutions."
+              echo "No new solutions found."
 
           else
 
